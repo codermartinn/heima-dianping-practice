@@ -35,11 +35,23 @@ public class FollowController {
 
     /**
      * 查看当前登录用户是否关注了 目标用户
+     *
      * @param followUserId 当前用户想关注的用户id
      * @return
      */
     @GetMapping("/or/not/{id}")
     public Result isFollow(@PathVariable("id") Long followUserId) {
         return followService.isFollow(followUserId);
+    }
+
+    /**
+     * 查询共同关注
+     *
+     * @param userId 目标用户
+     * @return 共同关注的用户信息
+     */
+    @GetMapping("/common/{id}")
+    public Result followCommon(@PathVariable("id") Long userId) {
+        return followService.followCommon(userId);
     }
 }

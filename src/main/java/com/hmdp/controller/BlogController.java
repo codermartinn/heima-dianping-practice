@@ -67,22 +67,38 @@ public class BlogController {
 
 
     /**
-     *  查看探店笔记
+     * 查看探店笔记
+     *
      * @param id blog的id
      * @return blog信息
      */
     @GetMapping("/{id}")
-    public Result queryBlogById(@PathVariable("id") Long id){
+    public Result queryBlogById(@PathVariable("id") Long id) {
         return blogService.queryBlogById(id);
     }
 
     /**
      * 查询blog最早点赞前5的人
+     *
      * @param id
      * @return
      */
     @GetMapping("/likes/{id}")
-    public Result queryBlogLikes(@PathVariable("id") Long id){
+    public Result queryBlogLikes(@PathVariable("id") Long id) {
         return blogService.queryBlogLikes(id);
+    }
+
+    /**
+     * 根据用户id查询博主的探店笔记
+     *
+     * @param userId  用户id
+     * @param current 当前页
+     * @return
+     */
+    @GetMapping("/of/user")
+    public Result queryBlogByUserId(@RequestParam("id") Long userId,
+                                    @RequestParam(value = "current", defaultValue = "1") Integer current) {
+
+        return blogService.queryBlogByUserId(userId, current);
     }
 }

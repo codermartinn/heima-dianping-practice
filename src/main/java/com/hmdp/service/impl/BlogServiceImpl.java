@@ -129,6 +129,17 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
         return Result.ok(userDTOS);
     }
 
+    @Override
+    public Result queryBlogByUserId(Long userId, Integer current) {
+        // 1.根据用户id查询探店笔记，最多查询当前第一页的10条
+        Page<Blog> page = query().eq("user_id", userId).page(new Page<>(current, 10));
+
+        // 2.获取当前页的数据
+        List<Blog> records = page.getRecords();
+
+        return Result.ok(records);
+    }
+
     /**
      * 查询发布blog的博主信息
      *
