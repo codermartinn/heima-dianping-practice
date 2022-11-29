@@ -7,10 +7,12 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.hmdp.dto.Result;
 import com.hmdp.dto.UserDTO;
 import com.hmdp.entity.Blog;
+import com.hmdp.entity.Follow;
 import com.hmdp.entity.User;
 import com.hmdp.mapper.BlogMapper;
 import com.hmdp.service.IBlogService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.hmdp.service.IFollowService;
 import com.hmdp.service.IUserService;
 import com.hmdp.utils.SystemConstants;
 import com.hmdp.utils.UserHolder;
@@ -24,6 +26,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static com.hmdp.utils.RedisConstants.BLOG_LIKED_KEY;
+import static com.hmdp.utils.RedisConstants.FEED_KEY;
 
 /**
  * <p>
@@ -40,6 +43,9 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
 
     @Resource
     private StringRedisTemplate stringRedisTemplate;
+
+    @Resource
+    private IFollowService followService;
 
     @Override
     public Result queryBlogById(Long id) {
@@ -138,6 +144,32 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
         List<Blog> records = page.getRecords();
 
         return Result.ok(records);
+    }
+
+    @Override
+    public Result saveBlog(Blog blog) {
+        // 1.获取当前登录用户id
+        Long userId = UserHolder.getUser().getId();
+
+        // 2.保存笔记
+        blog.setUserId(userId);
+        boolean isSuccess = save(blog);
+        if (!isSuccess) {
+            return Result.fail("保存笔记失败...");
+        }
+
+        // 3.获取当前登录用户的所有粉丝
+        List<Follow> follows = followService.query().eq("follow_user_id", userId).list();
+
+        // 4.在redis中保存blog的id,形式为sorted_set<粉丝id，笔记id，时间戳>
+        for (Follow follow : follows) {
+            // 4.1获取粉丝id
+            Long fansId = follow.getUserId();
+            // 4.2推送笔记id给粉丝
+            String key = FEED_KEY + fansId;
+            stringRedisTemplate.opsForZSet().add(key, blog.getId().toString(), System.currentTimeMillis());
+        }
+        return Result.ok(blog.getId());
     }
 
     /**

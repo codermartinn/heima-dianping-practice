@@ -30,16 +30,14 @@ public class BlogController {
     @Resource
     private IBlogService blogService;
 
-
+    /**
+     * blogger发布笔记，使用「推模式」发送给每个关注该blogger的用户
+     * @param blog 发布的笔记
+     * @return 笔记的id
+     */
     @PostMapping
     public Result saveBlog(@RequestBody Blog blog) {
-        // 获取登录用户
-        UserDTO user = UserHolder.getUser();
-        blog.setUserId(user.getId());
-        // 保存探店博文
-        blogService.save(blog);
-        // 返回id
-        return Result.ok(blog.getId());
+        return blogService.saveBlog(blog);
     }
 
     @PutMapping("/like/{id}")
