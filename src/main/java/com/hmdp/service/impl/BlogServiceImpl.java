@@ -5,6 +5,7 @@ import cn.hutool.core.util.BooleanUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.hmdp.dto.Result;
+import com.hmdp.dto.ScrollResult;
 import com.hmdp.dto.UserDTO;
 import com.hmdp.entity.Blog;
 import com.hmdp.entity.Follow;
@@ -17,9 +18,11 @@ import com.hmdp.service.IUserService;
 import com.hmdp.utils.SystemConstants;
 import com.hmdp.utils.UserHolder;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -170,6 +173,61 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
             stringRedisTemplate.opsForZSet().add(key, blog.getId().toString(), System.currentTimeMillis());
         }
         return Result.ok(blog.getId());
+    }
+
+
+    @Override
+    public Result queryBlogOfFollow(Long curMaxTime, Integer offset) {
+        // 1.获取当前登录用户id
+        Long userId = UserHolder.getUser().getId();
+
+        // 2.从redis中按score(时间戳)从大到小(从最新时间开始)获取数据
+        String key = FEED_KEY + userId;
+        Set<ZSetOperations.TypedTuple<String>> tuples = stringRedisTemplate.opsForZSet().reverseRangeByScoreWithScores(key, 0, curMaxTime, offset, 2);
+        // 判断非空
+        if (tuples == null || tuples.isEmpty()) {
+            return Result.ok();
+        }
+
+        // 3.解析数据
+        List<Long> ids = new ArrayList<>(tuples.size());
+        long minTime = 0;
+        // 与最小元素相同的个数
+        int count = 1;
+        for (ZSetOperations.TypedTuple<String> tuple : tuples) {
+            // 获取笔记id
+            String id = tuple.getValue();
+            ids.add(Long.valueOf(id));
+
+            // 获取时间戳,从大到小
+            long time = tuple.getScore().longValue();
+            if (time == minTime) {
+                count++;
+            } else {
+                minTime = time;
+                count = 1;
+            }
+        }
+
+        // 4.根据id查询blog
+        String idStr = StrUtil.join(",", ids);
+        String lastSql = "ORDER BY FIELD(id," + idStr + ")";
+        List<Blog> blogList = query().in("id", ids).last(lastSql).list();
+        // 5.每个blog需要添加数据库中没有的信息：发布博主的信息，和博文有没有被当前登录用户点赞
+        for (Blog blog : blogList) {
+            // 查询发布blog的blogger信息
+            queryBlogUser(blog);
+            // 查询当前登录用户有没有点赞该blog
+            isBlogLiked(blog);
+        }
+
+        // 4.封装结果并返回
+        ScrollResult r = new ScrollResult();
+        r.setList(blogList);
+        r.setMinTime(minTime);
+        r.setOffset(count);
+
+        return Result.ok(r);
     }
 
     /**

@@ -32,6 +32,7 @@ public class BlogController {
 
     /**
      * blogger发布笔记，使用「推模式」发送给每个关注该blogger的用户
+     *
      * @param blog 发布的笔记
      * @return 笔记的id
      */
@@ -98,5 +99,12 @@ public class BlogController {
                                     @RequestParam(value = "current", defaultValue = "1") Integer current) {
 
         return blogService.queryBlogByUserId(userId, current);
+    }
+
+
+    @GetMapping("/of/follow")
+    public Result queryBlogOfFollow(@RequestParam("lastId") Long curMaxTime,
+                                    @RequestParam(value = "offset", defaultValue = "0") Integer offset) {
+        return blogService.queryBlogOfFollow(curMaxTime,offset);
     }
 }

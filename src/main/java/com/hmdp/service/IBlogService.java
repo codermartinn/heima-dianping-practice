@@ -25,4 +25,6 @@ public interface IBlogService extends IService<Blog> {
     Result queryBlogByUserId(Long userId, Integer current);
 
     Result saveBlog(Blog blog);
+
+    Result queryBlogOfFollow(Long curMaxTime, Integer offset);
 }
