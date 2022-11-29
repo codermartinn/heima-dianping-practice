@@ -221,7 +221,7 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
             isBlogLiked(blog);
         }
 
-        // 4.封装结果并返回
+        // 6.封装结果并返回
         ScrollResult r = new ScrollResult();
         r.setList(blogList);
         r.setMinTime(minTime);
