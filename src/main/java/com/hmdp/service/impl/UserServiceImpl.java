@@ -12,13 +12,18 @@ import com.hmdp.entity.User;
 import com.hmdp.mapper.UserMapper;
 import com.hmdp.service.IUserService;
 import com.hmdp.utils.RegexUtils;
+import com.hmdp.utils.UserHolder;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.connection.BitFieldSubCommands;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpSession;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -120,6 +125,77 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
 
         // 8.返回token
         return Result.ok(token);
+    }
+
+
+    @Override
+    public Result signIn() {
+        // 1.获取用户id
+        Long userId = UserHolder.getUser().getId();
+
+        // 2.获取日期
+        LocalDateTime now = LocalDateTime.now();
+
+        // 3.拼接key
+        String sufferKey = now.format(DateTimeFormatter.ofPattern("yyyy:MM"));
+        String key = USER_SIGN_KEY + userId + ":" + sufferKey;
+
+        // 4.获取今天是本月的第几天
+        int dayOfMonth = now.getDayOfMonth();
+
+        // 5.写入redis
+        stringRedisTemplate.opsForValue().setBit(key, dayOfMonth - 1, true);
+
+        return Result.ok();
+    }
+
+    @Override
+    public Result signCount() {
+        // 1.获取用户id
+        Long userId = UserHolder.getUser().getId();
+
+        // 2.获取日期
+        LocalDateTime now = LocalDateTime.now();
+
+        // 3.拼接key
+        String sufferKey = now.format(DateTimeFormatter.ofPattern("yyyy:MM"));
+        String key = USER_SIGN_KEY + userId + ":" + sufferKey;
+
+        // 4.获取今天是本月的第几天
+        int dayOfMonth = now.getDayOfMonth();
+
+        // 5.获取本月到今天为止，用户连续签到的记录，返回的是一个十进制数字 BITFIELD sign:5:2022:03 get u[取几个bit位] 0[index从哪开始]
+        List<Long> results = stringRedisTemplate.opsForValue().bitField(
+                key,
+                BitFieldSubCommands.create()
+                        .get(BitFieldSubCommands.BitFieldType.unsigned(dayOfMonth))
+                        .valueAt(0)
+        );
+        // 处理数据为空情况
+        if (results == null || results.isEmpty()) {
+            return Result.ok(0);
+        }
+
+        Long num = results.get(0);
+        if (num == null || num == 0) {
+            return Result.ok(0);
+        }
+
+        // 6.循环遍历，计算出从后往前有几个连续的1
+        int count = 0;
+        while (true) {
+            if ((num & 1) == 0) {
+                // 如果为0，说明没签到，退出循环
+                break;
+            } else {
+                // 如果不为0，说明已签到，连续签到天数+1
+                count++;
+            }
+            //将num无符合右移一位，继续从后往前计算下一个bit位
+            num = num >>> 1;
+        }
+
+        return Result.ok(count);
     }
 
     private User createUserWithPhone(String phone) {
